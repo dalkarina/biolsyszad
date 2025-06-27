@@ -1,0 +1,1575 @@
+---
+title: "BIOLSYSZAL - Karina Dal"
+format: html
+editor: visual
+---
+
+------------------------------------------------------------------------
+
+## KARINA DAL!!!!!!! - ZADANIA BIOLOGIA SYSTEMOW
+
+Portrety fazowe:
+
+ZADANIE 1
+
+a\. Równania różniczkowe i izokliny zerowe
+
+Równania różniczkowe:
+
+dS1/dt = v1 - v3 - v5 = k1/(1 + (S2/K)\^n) - k3\*S1 - k5\*S1 = k1/(1 + (S2/K)\^n) - (k3 + k5)\*S1
+
+dS2/dt = v2 + v5 - v4 = k2 + k5\*S1 - k4\*S2 
+
+Izokliny zerowe:
+
+Dla dS1/dt = 0: S2(S1) = K \* ((k1/((k3 + k5)\*S1) - 1)\^(1/n)
+
+Dla dS2/dt = 0: S2(S1) = (k2 + k5\*S1)/k4
+
+b\)
+
+```{r}
+library(deSolve)
+library(ggplot2)
+
+parametry <- c(
+  k1 = 20, 
+  k2 = 5,
+  K  = 1,
+  k3 = 5, 
+  k4 = 5, 
+  k5 = 2,
+  n  = 4
+)
+
+funkcja1 <- function(t, state, parametry) {
+  with(as.list(c(state, parametry)), {
+    v1 <- k1 / (1 + (s2 / K)^n)
+    v2 <- k2
+    v3 <- k3 * s1
+    v4 <- k4 * s2
+    v5 <- k5 * s1
+
+    ds1 <- v1 - v3 - v5
+    ds2 <- v2 + v5 - v4
+    list(c(ds1, ds2))
+  })
+}
+
+stan_pocz <- c(s1 = 0, s2 = 0)
+czas_pocz  <- seq(0, 4, by = 0.01)
+out   <- ode(y = stan_pocz,
+             times = czas_pocz,
+             func  = funkcja1,
+             parms = parametry,
+             method = "lsoda")
+
+out_df <- as.data.frame(out)
+
+ggplot(out_df, aes(x = time)) +
+  geom_line(aes(y = s1, colour = "s1(t)")) +
+  geom_line(aes(y = s2, colour = "s2(t)")) +
+  scale_colour_manual(values = c("s1(t)" = "blue", "s2(t)" = "red")) +
+  labs(x = "czas [s]",
+       y = "stężenie [M]",
+       colour = "",
+       title = "Zmiana stężeń s1 i s2 w zaleznosci od czasu [t]") +
+  theme_minimal()
+
+```
+
+c\)
+
+```{r}
+with(as.list(prm), {
+  zakres_s2 <- seq(0, 3, length.out = 200)
+  zakres_s1 <- seq(0, 4, length.out = 200)
+
+  #obliczanie izokiny
+  izo1 <- k1 / ((k3 + k5) * (1 + (zakres_s2 / K)^n))
+  dobre <- !is.nan(izo1)
+  zakres_s2_czysty <- zakres_s2[dobre]
+  izo1_czysta <- izo1[dobre]
+
+  #druga izokina
+  izo2 <- (k2 + k5 * zakres_s1) / k4
+
+  #nowe parametry graficzne
+  stary_par <- par(no.readonly = TRUE)
+  par(mar = c(5, 4, 4, 8), xpd = FALSE)
+
+  # trajektoria
+  plot(out[, "s1"], out[, "s2"],
+       type = "l", lwd = 2, col = "green",
+       xlab = expression(s[1]~"[M]"),
+       ylab = expression(s[2]~"[M]"),
+       main = "Portret fazowy")
+
+
+  lines(izo1_czysta, zakres_s2_czysty, col = "red", lwd = 2, lty = 2)  # ds1/dt = 0
+  lines(zakres_s1, izo2, col = "blue", lwd = 2, lty = 2)                # ds2/dt = 0
+
+  # przywróć stare parametry graficzne
+  par(stary_par)
+})
+
+
+
+```
+
+d\)
+
+```{r}
+
+# nowe warunki początkowe
+starty <- list(
+  X = c(s1 = 10, s2 = 0),
+  Y = c(s1 = 5, s2 = 5),
+  Z = c(s1 = 0, s2 = 10)
+)
+
+# symulacje dla każdego zestawu startowego
+trajektorie <- lapply(starty, function(punkt_startowy) {
+  dane <- ode(y = punkt_startowy,
+              times = time,
+              func  = funkcja,
+              parms = prm,
+              method = "lsoda")
+  as.data.frame(dane)
+})
+
+s1_X <- trajektorie$X$s1; s2_X <- trajektorie$X$s2
+s1_Y <- trajektorie$Y$s1; s2_Y <- trajektorie$Y$s2
+s1_Z <- trajektorie$Z$s1; s2_Z <- trajektorie$Z$s2
+
+for(nazwa in names(trajektorie)) {
+  trajektorie[[nazwa]]$wariant <- nazwa
+}
+
+symulacja_df <- do.call(rbind, trajektorie)
+
+# wykres czasowy s1 i s2
+ggplot(symulacja_df, aes(x = time, colour = wariant)) +
+  geom_line(aes(y = s1, linetype = "s1")) +
+  geom_line(aes(y = s2, linetype = "s2")) +
+  scale_colour_manual(values = c(X = "blue", Y = "red", Z = "green")) +
+  scale_linetype_manual(values = c("s1" = 1, "s2" = 2), name = NULL) +
+  labs(title = "Dynamika stężeń S1 i S2 dla różnych startów",
+       x = "Czas [s]", y = "Stężenie [M]", colour = "legenda") +
+  theme_minimal(base_size = 13)
+
+# portret fazowy (s1 vs s2)
+ggplot(symulacja_df, aes(x = s1, y = s2, colour = wariant)) +
+  geom_path(size = 1.2) +
+  scale_colour_manual(values = c(X = "blue", Y = "red", Z = "green")) +
+  labs(title = "Portret fazowy trajektorii",
+       x = expression(S[1]~"[M]"), y = expression(S[2]~"[M]"),
+       colour = "legenda") +
+  theme_minimal(base_size = 13)
+
+```
+
+e\)
+
+```{r}
+# nowa funkcja definiująca układ równań różniczkowych
+uklad_dynamiki <- function(t, zmienne, parametry) {
+  s1 <- zmienne[1]
+  s2 <- zmienne[2]
+
+  k1 <- parametry[1]
+  k2 <- parametry[2]
+  k3 <- parametry[3]
+  k4 <- parametry[4]
+  k5 <- parametry[5]
+  K  <- parametry[6]
+  n  <- parametry[7]
+
+  zmiana_s1 <- k1 / (1 + (s2 / K)^n) - (k3 + k5) * s1
+  zmiana_s2 <- k5 * s1 + k2 - k4 * s2
+
+  list(c(zmiana_s1, zmiana_s2))
+}
+
+# punkty startowe trajektorii
+punkty_startowe <- list(
+  c(s1 = 0, s2 = 0),
+  c(s1 = 1, s2 = 0.5),
+  c(s1 = 0.5, s2 = 1)
+)
+
+# wektor parametrów
+paramy <- c(k1 = 20, k2 = 5, k3 = 5, k4 = 5, k5 = 2, K = 1, n = 4)
+
+# funkcja rysująca portret fazowy
+rysuj_portret <- function(paramy, tytul_wykresu) {
+  
+  plot(NA,
+       xlim = c(0, 2),
+       ylim = c(0, 2),
+       xlab = expression(s[1]),
+       ylab = expression(s[2]),
+       main = tytul_wykresu)
+
+  # pole wektorowe
+  flowField(uklad_dynamiki,
+            xlim = c(0, 2),
+            ylim = c(0, 2),
+            parameters = paramy,
+            system = "two.dim",
+            xlab = "",
+            ylab = "",
+            add = TRUE,
+            points = 15,
+            arrow.head = 0.05,
+            col = "lightgray")
+
+  # izoklina 1
+  s2_lin <- seq(0, 2, length.out = 200)
+  iso_s1 <- with(as.list(paramy), k1 / ((k3 + k5) * (1 + (s2_lin / K)^n)))
+  lines(iso_s1, s2_lin, col = "blue", lty = 2, lwd = 2)
+
+  # izoklina 2
+  s1_lin <- seq(0, 2, length.out = 200)
+  iso_s2 <- with(as.list(paramy), (k5 * s1_lin + k2) / k4)
+  lines(s1_lin, iso_s2, col = "red", lty = 2, lwd = 2)
+
+  kolory <- c("green", "violet", "orange")
+
+  # Trajektorie i punkty startowe
+  for (j in seq_along(punkty_startowe)) {
+    rozw <- ode(
+      y = punkty_startowe[[j]],
+      times = seq(0, 3, by = 0.01),
+      func = uklad_dynamiki,
+      parms = paramy
+    )
+
+    lines(rozw[, "s1"], rozw[, "s2"], col = kolory[j], lwd = 2)
+    points(punkty_startowe[[j]][1], punkty_startowe[[j]][2],
+           pch = 19, col = kolory[j])
+  }
+
+  legend("topleft",
+         legend = c("Pole wektorowe", "Izoklina ds1/dt = 0", "Izoklina ds2/dt = 0",
+                    "(0,0)", "(1,0.5)", "(0.5,1)"),
+         col = c("lightgray", "blue", "red", kolory),
+         lty = c(1, 2, 2, rep(1, 3)),
+         lwd = c(1, 2, 2, rep(2, 3)),
+         pch = c(NA, NA, NA, 19, 19, 19),
+         bg = "white",
+         bty = "o")
+}
+
+# Wywołanie rysowania
+rysuj_portret(paramy, "Portret fazowy układu")
+
+```
+
+Zadanie 2 z faz:.
+
+a\) Oznaczmy stężenia dwóch białek przez S1(t) i S2(t)). Produkcja każdego z nich jest hamowana przez drugie białko (w sensie nieliniowym typu Hill’a), a obie degradowane są wprost proporcjonalnie do swojego stężenia. Przyjmujemy ogólne postaci szybkości:
+
+v1​(S2​) ​=k1\*(​K1\^n2​​/(​K1\^n2+S2\^n2))​​​, ​– produkcja S1​ pod hamowaniem przez S2​,
+
+v2​(S1​) =k2\*​(K2\^n1​​/(K2\^n1+S1\^n1​​)) – produkcja S2​ pod hamowaniem przez S1​,​​​
+
+v3​(S1​) =k3​\*S1 – degradacja S1​​
+
+v4​(S2​) =k4​\*S2 – degradacja S2​.​​
+
+Stad rownania:
+
+​dt/dS1​​=v1​(S2​)−v3​(S1​)=k1\*(​K1\^n2​​/(​K1\^n2+S2\^n2))​​​​​​−k3​\*S1​,
+
+dt/dS2​​=v2​(S1​)−v4​(S2​)=k2​\*​(K2\^n1​​/(K2\^n1+S1\^n1​​)) −k4\*​S2​.​
+
+Stezenia stacjonarne i izokliny zerowe:
+
+1.  Stany stacjonarne (S1\*, S2\*) znajdujemy z:
+
+k1\*K1\^n2/(K1\^n2+(S2)\^n2) = k3\*S1\*
+
+k2\*K2\^n1/(K2\^n1+(S1)\^n1) = k4\*S2\*
+
+2a) Izoklina dS1/dt = 0 (krzywa w układzie (S1,S2))
+
+S1=(k1/k3)\*(K1\^n2/(K1\^n2+S2\^n2))
+
+2b) Izoklina dS2/dt = 0
+
+S2=(k2/k4)\*(K2\^n1/(K2\^n1+S1\^n1))
+
+Wspólne przecięcie tych dwóch krzywych to stany stacjonarne.
+
+b\) Jeśli założymy symetryczne parametry:
+
+  k1=k2,  K1=K2,  k3=k4,
+
+ale różne wykładniki Hill’a n1≠n2, to układ staje się asymetryczny.
+
+Gdy np. n1\>n2​, tzn. produkcja S2​ jest bardziej czuła na S1​ niż odwrotnie, to przy zerowych warunkach początkowych nawet niewielkie zaburzenie w kierunku wzrostu S1 silnie zahamuje S2 co prowadzi do przewAGi S1​.
+
+Gdy n1=n2 układ jest symetryczny i obie izokliny mają ten sam kształt. W ramach drobnych zaburzeń oba białka mogą oscylować wokół wspólnego stanu bądź dążyć do symetrycznego, pojedynczego punktu stacjonarnego.
+
+c\) i d)
+
+```{r}
+
+library(phaseR)
+library(deSolve)
+
+#ustalenie funckji
+mutual_inhibition <- function(t, state, parameters) {
+  S1 <- state[1]; S2 <- state[2]
+  with(as.list(parameters), {
+    v1  <- k1 * K1^n2 / (K1^n2 + S2^n2)
+    v2  <- k2 * K2^n1 / (K2^n1 + S1^n1)
+    dS1 <- v1 - k3 * S1
+    dS2 <- v2 - k4 * S2
+    list(c(dS1, dS2))
+  })
+}
+
+#lista parametrow
+param_sets <- list(
+  asym = list(k1=20, k2=20, K1=1, K2=1, n1=4, n2=1, k3=5, k4=5), #asymetryczne
+  sym  = list(k1=20, k2=20, K1=1, K2=1, n1=4, n2=4, k3=5, k4=5) #symetryczne
+)
+
+init.conds <- list(c(0,0), c(4,1), c(1,4), c(2,2))
+
+for(name in names(param_sets)) {
+  pars <- param_sets[[name]]
+  
+  plot(NA, xlim = c(0,5), ylim = c(0,5),
+       xlab = "S1", ylab = "S2",
+       main = paste("Mutual inhibition -", name, "case"))
+  
+  flowField(mutual_inhibition,
+            xlim = c(0,5), ylim = c(0,5),
+            parameters = pars,
+            points = 20,
+            add = TRUE)
+  
+  nullclines(mutual_inhibition,
+             xlim = c(0,5), ylim = c(0,5),
+             parameters = pars,
+             col = c("blue", "red"),
+             add = TRUE)
+  
+  legend("topright",
+         legend = c("dS1/dt = 0", "dS2/dt = 0"),
+         col = c("blue", "red"),
+         lty = 1)
+  
+  for(ic in init.conds) {
+    trajectory(mutual_inhibition,
+               y0 = ic,
+               tlim = c(0,10),
+               parameters = pars,
+               add = TRUE,
+               col = "red")
+  }
+  
+  for(ic in init.conds) {
+    t <- seq(0, 10, by = 0.01)
+    out <- ode(y = c(S1 = ic[1], S2 = ic[2]),
+               t = t,
+               func = mutual_inhibition,
+               parms = pars)
+    
+    matplot(out[,"time"], out[,c("S1","S2")],
+            type = "l", lty = 1, col = 1:2,
+            xlab = "t", ylab = "stężenie",
+            main = paste("Trajektoria czasowa (", name, 
+                         " case), start = [", ic[1], ",", ic[2], "]"))
+    
+    legend("right", legend = c("S1", "S2"), col = 1:2, lty = 1)
+  }
+}
+
+
+```
+
+------------------------------------------------------------------------
+
+Zad 3 z faz:
+
+I. Uproszczenie równań:
+
+1.  Charakterystyczna skala czasowa to T = V/Q. Wprowadzamy czas bezwymiarowy l = t/T, więc t = lT.
+
+2.  Stężenie wyrażamy jako c = eK, gdzie e to stężenie bezwymiarowe.
+
+3.  Bezwymiarowe współczynniki: y = r_max \* T oraz gestosc bakterii rho = b \* K/v, gdzie b to bezwymiarowa gęstość bakterii.
+
+Po podstawieniach otrzymujemy równania:
+
+db/dl = (y \* e/(1 + e) - 1) \* b
+
+de/dl = e_in - e - y \* (e/(1 + e)) \* b
+
+II. Znalezienie izoklin zerowych:
+
+```{=html}
+<!-- -->
+```
+1.  Izoklina dla
+
+    db/dl = 0: (y \* e/(1 + e) - 1) \* b = 0
+
+    b = 0
+
+    y \* e/(1 + e) = 1 =\> e = 1/(y - 1)
+
+```{=html}
+<!-- -->
+```
+2.  Izoklina dla de/dl = 0: e_in - e - y \* (e/(1 + e)) \* b = 0 =\> b = (e_in - e) \* (1 + e)/(y \* e)
+
+Punkty stałe znajdują się na przecięciu izoklin: 1. Punkt (e, b) = (1/(y - 1), (e_in - 1/(y - 1)) \* (y/(y - 1))/y) 2. Punkt (e, b) = (e_in, 0)
+
+Warunki "fizyczne": 1. Dla pierwszego punktu: - y \> 1 (aby e = 1/(y - 1) \> 0) - e_in \>= 1/(y - 1) (aby b \>= 0)
+
+2.  Dla drugiego punktu:
+
+-   e_in \>= 0 (zawsze spełnione, bo stężenie nie może być ujemne)
+-   b = 0 jest zawsze dopuszczalne
+
+Podsumowanie: Aby istniał niezerowy punkt stacjonarny (b \> 0), muszą być spełnione warunki: y \> 1 oraz e_in \>= 1/(y - 1). W przeciwnym przypadku jedynym punktem stacjonarnym jest (e_in, 0).
+
+Portret fazowy:
+
+```{r}
+library(deSolve)
+library(ggplot2)
+
+# Parametry bezwymiarowe
+wspolczynnik_wzrostu <- 2      
+st_wejscia <- 3     
+
+# Funkcja równań różniczkowych
+model_chemostatu <- function(t, stan, parametry) {
+  with(as.list(c(stan, parametry)), {
+    d_gestosc <- gestosc * (wspolczynnik_wzrostu * st_chem/(1 + st_chem) - 1)
+    d_st_chem <- st_wejscia - st_chem - wspolczynnik_wzrostu * st_chem/(1 + st_chem) * gestosc
+    list(c(d_gestosc, d_st_chem))
+  })
+}
+
+# Warunki początkowe
+stan_poczatkowy <- c(gestosc = 0.1, st_chem = 0.5)
+czasy <- seq(0, 20, by = 0.1)
+
+# Symulacja
+wyniki <- ode(y = stan_poczatkowy, times = czasy, func = model_chemostatu, parms = NULL)
+wyniki <- as.data.frame(wyniki)
+
+# Wykres zmian w czasie
+wykres <- ggplot(wyniki, aes(x = time)) +
+  geom_line(aes(y = gestosc, colour = 'gestosc')) +
+  geom_line(aes(y = st_chem, colour = 'st_chem')) +
+  labs(y = 'Zmienne bezwymiarowe', x = 'tau') +
+  scale_colour_manual('', values = c('gestosc' = 'blue', 'st_chem' = 'red'))
+print(wykres)
+
+# Funkcja do portretu fazowego
+rysuj_portret_fazowy <- function(st_wejscia, wspolczynnik_wzrostu, zakres_x = c(0, 3), zakres_y = c(0, 3)) {
+  etykieta <- if (wspolczynnik_wzrostu > 1.5) "a" else "b"
+  plot(NA, NA, xlim = zakres_x, ylim = zakres_y,
+       xlab = expression(bar(c)), ylab = expression(bar(rho)),
+       main = paste0(etykieta, ": st_wejscia=", st_wejscia, ", γ=", wspolczynnik_wzrostu))
+
+  # Izokliny
+  curve((st_wejscia - x)*(1 + x)/(wspolczynnik_wzrostu * x),
+        from = 1e-3, to = zakres_x[2],
+        col = "red", lwd = 2, add = TRUE)
+  st_rownowagi <- 1/(wspolczynnik_wzrostu - 1)
+  if (st_rownowagi > zakres_x[1] && st_rownowagi < zakres_x[2]) {
+    abline(v = st_rownowagi, col = "blue", lwd = 2)
+  }
+  abline(h = 0, col = "blue", lwd = 2)
+
+  # Pole wektorowe
+  punkty_x <- seq(zakres_x[1] + .1, zakres_x[2] - .1, length = 16)
+  punkty_y <- seq(zakres_y[1] + .1, zakres_y[2] - .1, length = 16)
+  for (x in punkty_x) for (y in punkty_y) {
+    szybkosc <- wspolczynnik_wzrostu * x/(1 + x) * y
+    wektor <- c(dc = st_wejscia - x - szybkosc,
+                drho = szybkosc - y)
+    dlugosc <- sqrt(sum(wektor^2))
+    arrows(x, y,
+           x + 0.08 * wektor[1]/dlugosc,
+           y + 0.08 * wektor[2]/dlugosc,
+           length = 0.04, col = "green")
+  }
+
+  # Trajektorie
+  warunki_poczatkowe <- list(
+    c(gestosc = 1.95, st_chem = 2.35),
+    c(gestosc = 1.25, st_chem = 2.8)
+  )
+  czasy <- seq(0, 20, by = 0.1)
+  for (stan_pocz in warunki_poczatkowe) {
+    traj <- ode(y = stan_pocz,
+                times = czasy,
+                func = model_chemostatu,
+                parms = list(st_wejscia = st_wejscia, wspolczynnik_wzrostu = wspolczynnik_wzrostu))
+    lines(traj[,"st_chem"], traj[,"gestosc"], lwd = 2, col = "black")
+    m <- floor(nrow(traj)/2)
+    arrows(traj[m, "st_chem"], traj[m, "gestosc"],
+           traj[m+1, "st_chem"], traj[m+1, "gestosc"],
+           length = 0.06, col = "black")
+  }
+
+  # Punkty równowagi
+  if (st_rownowagi > zakres_x[1] && st_rownowagi < zakres_x[2]) {
+    gestosc_rownowagi <- (st_wejscia - st_rownowagi)*(1 + st_rownowagi)/(wspolczynnik_wzrostu * st_rownowagi)
+    points(st_rownowagi, gestosc_rownowagi, pch = 16, col = "blue", cex = 1.5)
+  }
+  points(st_wejscia, 0, pch = 16, col = "red", cex = 1.5)
+}
+
+# Dwa portrety fazowe obok siebie
+par(mfrow = c(1, 2), mar = c(5, 5, 4, 2))
+
+rysuj_portret_fazowy(st_wejscia = 3, wspolczynnik_wzrostu = 2)
+rysuj_portret_fazowy(st_wejscia = 3, wspolczynnik_wzrostu = 1.25)
+```
+
+a\) Gdy maksymalne tempo wzrostu w przeliczeniu na czas rozcieńczania (y) jest wystarczająco duże to bakterie stabilizuja sie w chemostacie i osiągają niezerowe stężenie.
+
+b\) Gdy y jest za małe, układ nie nawiązuje stabilizacji z niezerową populacją, tylko dochodzi do całkowitego wymycia
+
+Zad 4 z faz:
+
+a\) Opis modelu dynamicznego układu transkrypcji i translacji z autoregulacją
+
+Model ten przedstawia zmiany stężenia dwóch cząsteczek: informacyjnego RNA genu cI (oznaczanego jako mCI) oraz kodowanego przez niego białka represora (pCI). Układ zawiera dodatnie sprzężenie zwrotne oraz enzymatyczną degradację białka.
+
+Równanie dla mCI (mRNA):
+
+rm_max \* (1 / (1 + (DYST / pCI)\^n) + lPRM) - ym \* mCI
+
+Produkcja mRNA: określana przez maksymalną wydajność transkrypcji rm_max, zmodyfikowaną przez aktywację promotora przez białko pCI oraz niewielką ekspresję bazową leak.
+
+Funkcja aktywująca: im wyższe stężenie pCI, tym silniejsza aktywacja promotora. Dla pCI ≫ DYST produkcja osiąga maksimum, dla pCI ≪ DYST — spada do wartości minimalnej.
+
+Degradacja mRNA: liniowa, ze stałą szybkością ym.
+
+Równanie dla pCI (białko):
+
+rp \* mCI - yp \* pCI - KCAT \* pL \* (1 / (1 + Km / pCI))
+
+Synteza białka: zależna od obecności mCI, z szybkością translacji rp.
+
+Naturalny rozkład białka: z prędkością yp.
+
+Enzymatyczna degradacja: opisana funkcją Michaelisa-Mentena, zależna od stężenia proteazy pL.
+
+Opis biologiczny:
+
+Sprzężenie dodatnie: białko pCI wzmacnia transkrypcję własnego genu, co może prowadzić do istnienia dwóch stabilnych stanów (niski i wysoki poziom ekspresji).
+
+Rozkład enzymatyczny: umożliwia ostrzejsze przełączanie między stanami poprzez zależność nieliniową
+
+b\)
+
+```{r}
+library(deSolve)
+
+# Parametry
+parametry <- list(
+  wsp_Hill = 1,
+  st_DYST = 2.5e-8,
+  lPRM = 0.1,
+  KCAT = 0.071, 
+  Km = 3.7e-9,
+  maks_synteza_mRNA = 1.35e-9, 
+  degradacja_mRNA = 2.38e-3, 
+  synteza_bialka = 5e-5, 
+  degradacja_bialka = 2e-4, 
+  st_L = 1e-10
+)
+
+# Model
+model_mRNA_bialko <- function(t, stan, parametry) {
+  with(as.list(c(stan, parametry)), {
+    zmiana_mRNA <- maks_synteza_mRNA * (1 / (1 + (st_DYST / bialko_CI)^wsp_Hill) + lPRM) - degradacja_mRNA * mRNA_CI
+    zmiana_bialka <- synteza_bialka * mRNA_CI - degradacja_bialka * bialko_CI - KCAT * st_L * (1 / (1 + Km / bialko_CI))
+    return(list(c(zmiana_mRNA, zmiana_bialka)))
+  })
+}
+
+stan_poczatkowy <- c(mRNA_CI = 0, bialko_CI = 0)
+czasy <- seq(0, 10000, by = 10)  
+
+wyniki <- ode(y = stan_poczatkowy, times = czasy, func = model_mRNA_bialko, parms = parametry)
+
+wyniki_df <- as.data.frame(wyniki)
+
+plot(wyniki_df$time, wyniki_df$mRNA_CI, type = "l", col = "blue", 
+     xlab = "Czas (s)", ylab = "Stężenie (M)", 
+     main = "Dynamika mRNA cI i białka cI",
+     ylim = c(0, max(wyniki_df$mRNA_CI, wyniki_df$bialko_CI) * 1.1))
+lines(wyniki_df$time, wyniki_df$bialko_CI, col = "red")
+legend("topright", legend = c("mRNA cI", "Białko cI"), 
+       col = c("blue", "red"), lty = 1, cex = 0.6)
+grid()
+
+plot(wyniki_df$time, wyniki_df$mRNA_CI, type = "l", 
+     xlab = "Czas (s)", ylab = "Stężenie mRNA cI (M)",
+     main = "Dynamika mRNA cI", col = "blue", lwd = 2)
+grid()
+legend("topright", legend = "mRNA cI", col = "blue", lty = 1, lwd = 2)
+
+plot(wyniki_df$time, wyniki_df$bialko_CI, type = "l", 
+     xlab = "Czas (s)", ylab = "Stężenie białka cI (M)",
+     main = "Dynamika białka cI", col = "red", lwd = 2)
+grid()
+legend("topright", legend = "Białko cI", col = "red", lty = 1, lwd = 2)
+
+```
+
+c\)
+
+```{r}
+library(phaseR)
+
+par(mar = c(4, 4, 2.5, 1.5) + 0.1)
+
+# Parametry 
+parametry <- list(
+  wsp_Hill = 1,
+  st_DYST = 2.5e-8,
+  lPRM = 0.1,
+  KCAT = 0.071, 
+  Km = 3.7e-9,
+  maks_synteza_mRNA = 1.35e-9, 
+  degradacja_mRNA = 2.38e-3, 
+  synteza_bialka = 5e-5, 
+  degradacja_bialka = 2e-4, 
+  st_L = 1e-10
+)
+
+model_fazowy <- function(t, stan, parametry) {
+  with(as.list(c(parametry)), {
+    zmiana_mRNA <- maks_synteza_mRNA * (1/(1 + (st_DYST/stan[2])^wsp_Hill) + lPRM) - degradacja_mRNA*stan[1]
+    zmiana_bialka <- synteza_bialka*stan[1] - degradacja_bialka*stan[2] - KCAT*st_L*(1/(1 + Km/stan[2]))
+    return(list(c(zmiana_mRNA, zmiana_bialka)))
+  })
+}
+
+plot.new()
+plot.window(xlim = c(0, 7e-7), ylim = c(0, 1.5e-7))
+title(main = "Portret fazowy: mRNA cI vs białko cI",
+      xlab = "Stężenie mRNA cI (M)",
+      ylab = "Stężenie białka cI (M)")
+axis(1); axis(2)
+box()
+grid()
+
+# Pole wektorowe
+flowField(model_fazowy, 
+          parameters = parametry,
+          xlim = c(0, 7e-7),
+          ylim = c(0, 1.5e-7),
+          add = TRUE,
+          arrow.head = 0.05,
+          frac = 0.8)
+
+# Izokliny zerowe
+nullclines(model_fazowy,
+           parameters = parametry,
+           xlim = c(0, 7e-7),
+           ylim = c(0, 7e-7),
+           points = 300,
+           col = c("blue", "red"),
+           lwd = 2,
+           add = TRUE)
+
+czasy_krotkie <- seq(0, 1000, by = 20)
+
+# Trajektorie
+warunki_poczatkowe <- list(
+  c(1e-8, 1e-7),
+  c(5e-8, 5e-7),
+  c(1e-7, 1e-6)
+)
+
+for (warunek in warunki_poczatkowe) {
+  rozwiazanie <- ode(y = warunek, times = czasy_krotkie, func = model_fazowy, parms = parametry)
+  lines(rozwiazanie[,2], rozwiazanie[,3], col = "green", lwd = 1.5)
+}
+
+legend("topright", 
+       legend = c("Izoklina mRNA", "Izoklina białka", "Trajektorie"),
+       col = c("blue", "red", "green"), 
+       lty = 1,
+       cex = 0.5) 
+grid()
+
+par(mar = c(5, 4, 4, 2) + 0.1)
+```
+
+Miejsca przecięcia izoklin zerowych to punkty rownowagi, na wykresie istnieje taki jeden.
+
+d\) Zmieniony wspolczynnik na 2
+
+```{r}
+# Parametry (z n=2 zamiast n=1)
+parametry <- list(
+  wsp_Hill = 2, 
+  st_DYST = 2.5e-8,
+  lPRM = 0.1,
+  KCAT = 0.071, 
+  Km = 3.7e-9,
+  maks_synteza_mRNA = 1.35e-9, 
+  degradacja_mRNA = 2.38e-3, 
+  synteza_bialka = 5e-5, 
+  degradacja_bialka = 2e-4, 
+  st_L = 1e-10
+)
+
+model_mRNA_bialko2 <- function(t, stan, parametry) {
+  with(as.list(c(stan, parametry)), {
+    zmiana_mRNA <- maks_synteza_mRNA * (1 / (1 + (st_DYST / bialko_CI)^wsp_Hill) + lPRM) - degradacja_mRNA * mRNA_CI
+    zmiana_bialka <- synteza_bialka * mRNA_CI - degradacja_bialka * bialko_CI - KCAT * st_L * (1 / (1 + Km / bialko_CI))
+    return(list(c(zmiana_mRNA, zmiana_bialka)))
+  })
+}
+
+stan_poczatkowy <- c(mRNA_CI = 0, bialko_CI = 0)
+czasy <- seq(0, 10000, by = 10)  
+
+wyniki <- ode(y = stan_poczatkowy, times = czasy, func = model_mRNA_bialko2, parms = parametry)
+
+wyniki_df <- as.data.frame(wyniki)
+
+plot(wyniki_df$time, wyniki_df$mRNA_CI, type = "l", col = "blue", 
+     xlab = "Czas (s)", ylab = "Stężenie (M)", 
+     main = "Dynamika mRNA cI i białka cI",
+     ylim = c(0, max(wyniki_df$mRNA_CI, wyniki_df$bialko_CI) * 1.1))
+lines(wyniki_df$time, wyniki_df$bialko_CI, col = "red")
+legend("topright", legend = c("mRNA cI", "Białko cI"), 
+       col = c("blue", "red"), lty = 1, cex = 0.6)
+grid()
+
+plot(wyniki_df$time, wyniki_df$mRNA_CI, type = "l", 
+     xlab = "Czas (s)", ylab = "Stężenie mRNA cI (M)",
+     main = "Dynamika mRNA cI", col = "blue", lwd = 2)
+grid()
+legend("topright", legend = "mRNA cI", col = "blue", lty = 1, lwd = 2)
+
+plot(wyniki_df$time, wyniki_df$bialko_CI, type = "l", 
+     xlab = "Czas (s)", ylab = "Stężenie białka cI (M)",
+     main = "Dynamika białka cI", col = "red", lwd = 2)
+grid()
+legend("topright", legend = "Białko cI", col = "red", lty = 1, lwd = 2)
+```
+
+W c) izokliny przecinają się w jednym punkcie stałym przy n = 1, co znaczy, że układ posiada jeden stabilny stan równowagi. Natomiast przy n = 2 (d) izokliny są bardziej zakrzywione.
+
+Zmiana wspolczynnika z 1 do 2 zwieksza nieliniowość regulacji i zmienia układ ze zwykłego regulatora w rzeczywisty genetyczny przełącznik, co ma duze znaczenie dla stabilności utrzymania pamięci epigenetycznej w komórce i ekspresji genów
+
+f\)
+
+```{r}
+library(deSolve)
+library(phaseR)
+
+# Parametry modelu
+parametry <- list(
+  wsp_Hill = 2,
+  st_DYST = 2.5e-8,
+  lPRM = 0.1,
+  kataliza = 0.071, 
+  Km = 3.7e-9,
+  maks_synteza_mRNA = 1.35e-9, 
+  degradacja_mRNA = 2.38e-3, 
+  synteza_bialka = 5e-5, 
+  degradacja_bialka = 2e-4, 
+  st_L = 1e-10
+)
+
+# Wartości Km do analizy
+wartosci_Km <- c(1e-10, 3.7e-9, 1e-7)
+
+# Model zmian stężeń w czasie
+model_stężeń <- function(t, stan, parametry) {
+  with(as.list(c(stan, parametry)), {
+    zmiana_mRNA <- maks_synteza_mRNA * (1 / (1 + (st_DYST / bialko_CI)^wsp_Hill) + lPRM) - degradacja_mRNA * mRNA_CI
+    zmiana_bialka <- synteza_bialka * mRNA_CI - degradacja_bialka * bialko_CI - kataliza * st_L * (1 / (1 + Km / bialko_CI))
+    return(list(c(zmiana_mRNA, zmiana_bialka)))
+  })
+}
+
+# Model dla portretu fazowego
+model_fazowy <- function(t, stan, parametry) {
+  with(as.list(c(parametry)), {
+    zmiana_mRNA <- maks_synteza_mRNA * (1/(1 + (st_DYST/stan[2])^wsp_Hill) + lPRM) - degradacja_mRNA*stan[1]
+    zmiana_bialka <- synteza_bialka*stan[1] - degradacja_bialka*stan[2] - kataliza*st_L*(1/(1 + Km/stan[2]))
+    return(list(c(zmiana_mRNA, zmiana_bialka)))
+  })
+}
+
+# Analiza dla różnych wartości Km
+for (aktualne_Km in wartosci_Km) {
+  parametry$Km <- aktualne_Km
+  
+  # Symulacja dynamiki czasowej
+  wyniki <- ode(y = c(mRNA_CI = 0, bialko_CI = 0), 
+               times = seq(0, 10000, by = 10), 
+               func = model_stężeń, 
+               parms = parametry)
+  
+  wyniki_df <- as.data.frame(wyniki)
+  
+  # Wykres dynamiki czasowej
+  plot(wyniki_df$time, wyniki_df$mRNA_CI, type = "l", col = "blue", 
+       xlab = "Czas (s)", ylab = "Stężenie (M)", 
+       main = paste("Dynamika mRNA i białka cI (Km =", format(aktualne_Km, scientific = TRUE), ")"),
+       ylim = c(0, max(wyniki_df$mRNA_CI, wyniki_df$bialko_CI) * 1.1))
+  lines(wyniki_df$time, wyniki_df$bialko_CI, col = "red")
+  legend("topright", legend = c("mRNA cI", "Białko cI"), 
+         col = c("blue", "red"), lty = 1, cex = 0.6)
+  grid()
+  
+  # Przygotowanie portretu fazowego
+  par(mar = c(4, 4, 2.5, 1.5) + 0.1)
+  
+  plot.new()
+  plot.window(xlim = c(0, 7e-7), ylim = c(0, 1.5e-7))
+  title(main = paste("Portret fazowy (Km =", format(aktualne_Km, scientific = TRUE), ")"),
+        xlab = "Stężenie mRNA cI (M)",
+        ylab = "Stężenie białka cI (M)")
+  axis(1); axis(2)
+  box()
+  grid()
+  
+  # Pole wektorowe
+  flowField(model_fazowy, 
+            parameters = parametry,
+            xlim = c(0, 7e-7),
+            ylim = c(0, 1.5e-7),
+            add = TRUE,
+            arrow.head = 0.05,
+            frac = 0.8)
+  
+  # Izokliny zerowe
+  nullclines(model_fazowy,
+             parameters = parametry,
+             xlim = c(0, 7e-7),
+             ylim = c(0, 7e-7),
+             points = 300,
+             col = c("blue", "red"),
+             lwd = 2,
+             add = TRUE)
+  
+  # Trajektorie fazowe
+  czasy_krotkie <- seq(0, 1000, by = 20)
+  warunki_poczatkowe <- list(
+    c(1e-8, 1e-7),
+    c(5e-8, 5e-7),
+    c(1e-7, 1e-6)
+  )
+  
+  for (warunek in warunki_poczatkowe) {
+    trajektoria <- ode(y = warunek, times = czasy_krotkie, func = model_fazowy, parms = parametry)
+    lines(trajektoria[,2], trajektoria[,3], col = "green", lwd = 1.5)
+  }
+  
+  legend("topright", 
+         legend = c("Izoklina mRNA", "Izoklina białka", "Trajektorie"),
+         col = c("blue", "red", "green"), 
+         lty = 1,
+         cex = 0.35) 
+  grid()
+  
+  par(mar = c(5, 4, 4, 2) + 0.1)
+}
+```
+
+Model Lurii-Delbricka:
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+# Stałe symulacji
+liczba_symulacji <- 500
+liczba_generacji <- 21
+poczatkowa_populacja <- 200
+wspolczynnik_mutacji <- 2e-9
+
+# Model ewolucji z mutacjami
+symuluj_ewolucje <- function(pocz_pop, mut_rate, generacje) {
+  populacja_dzika <- pocz_pop
+  populacja_mutantow <- 0
+  for (gen in 1:generacje) {
+    populacja_dzika <- populacja_dzika * 2
+    populacja_mutantow <- populacja_mutantow * 2
+    liczba_mutacji <- rpois(1, lambda = populacja_dzika * mut_rate)
+    liczba_mutacji <- min(liczba_mutacji, populacja_dzika)
+    populacja_dzika <- populacja_dzika - liczba_mutacji
+    populacja_mutantow <- populacja_mutantow + liczba_mutacji
+  }
+  return(populacja_mutantow)
+}
+
+# Model Poissona
+symuluj_poissona <- function(pocz_pop, mut_rate, generacje) {
+  laczna_liczba_podzialow <- pocz_pop * (2^generacje - 1)
+  rpois(1, lambda = laczna_liczba_podzialow * mut_rate)
+}
+
+# Kategoryzacja wyników
+przydziel_kategorie <- function(wartosc) {
+  if (wartosc == 0) return("0")
+  else if (wartosc == 1) return("1")
+  else if (wartosc == 2) return("2")
+  else if (wartosc == 3) return("3")
+  else if (wartosc == 4) return("4")
+  else if (wartosc == 5) return("5")
+  else if (wartosc <= 10) return("6–10")
+  else if (wartosc <= 20) return("11–20")
+  else if (wartosc <= 50) return("21–50")
+  else if (wartosc <= 100) return("51–100")
+  else if (wartosc <= 200) return("101–200")
+  else return("201–500")
+}
+
+# Przeprowadzenie symulacji
+set.seed(77)
+wyniki_modelu_ewolucyjnego <- sapply(1:liczba_symulacji, function(i) symuluj_ewolucje(poczatkowa_populacja, wspolczynnik_mutacji, liczba_generacji))
+wyniki_modelu_poissona <- sapply(1:liczba_symulacji, function(i) symuluj_poissona(poczatkowa_populacja, wspolczynnik_mutacji, liczba_generacji))
+
+lista_kategorii <- c("0","1","2","3","4","5","6–10","11–20","21–50","51–100","101–200","201–500")
+
+# Przygotowanie danych dla modelu ewolucyjnego
+dane_ewolucja <- data.frame(model = "Ewolucyjny", kategoria = sapply(wyniki_modelu_ewolucyjnego, przydziel_kategorie)) |>
+  group_by(model, kategoria) |>
+  summarise(prawdopodobienstwo = n()/liczba_symulacji, .groups = "drop")
+
+# Przygotowanie danych dla modelu Poissona
+dane_poisson <- data.frame(model = "Poisson", kategoria = sapply(wyniki_modelu_poissona, przydziel_kategorie)) |>
+  group_by(model, kategoria) |>
+  summarise(prawdopodobienstwo = n()/liczba_symulacji, .groups = "drop")
+
+# Połączenie danych
+dane_razem <- bind_rows(dane_poisson, dane_ewolucja)
+dane_razem$kategoria <- factor(dane_razem$kategoria, levels = lista_kategorii)
+
+# Uzupełnienie brakujących kategorii
+dane_pelne <- dane_razem %>%
+  complete(model, kategoria = factor(lista_kategorii, levels = lista_kategorii), fill = list(prawdopodobienstwo = 1e-10)) %>%
+  mutate(prawdopodobienstwo = ifelse(prawdopodobienstwo < 1e-10, 1e-10, prawdopodobienstwo))
+
+# Kolory wykresów
+paleta_kolorow <- c("Poisson" = "red", "Ewolucyjny" = "blue")
+
+# Wykres pierwszy - porównanie modeli
+ggplot() +
+  geom_col(data = filter(dane_pelne, model == "Ewolucyjny"), 
+           aes(x = kategoria, y = prawdopodobienstwo),
+           fill = "gray", width = 0.9, show.legend = FALSE) +
+  geom_line(data = dane_pelne, 
+            aes(x = kategoria, y = prawdopodobienstwo, group = model, color = model), 
+            linewidth = 1) +
+  geom_point(data = dane_pelne, 
+             aes(x = kategoria, y = prawdopodobienstwo, color = model), 
+             size = 2) +
+  scale_color_manual(values = paleta_kolorow) +
+  labs(title = "Symulacja eksperymentu Luria-Delbrück - a",
+       x = "Liczba mutantów (m)",
+       y = expression(Estymowane~italic(P)(m)),
+       color = "Model") +
+  theme_minimal() +
+  theme(
+    legend.position = c(0.85, 0.8),
+    legend.key.width = unit(2.5,"lines"),
+    legend.text = element_text(size = 10),
+    legend.title = element_blank(),
+    axis.text.x = element_text(angle = 90, hjust=1, vjust = 0.5, size =10)
+  )
+
+# Wykres drugi - skala logarytmiczna
+ggplot(dane_pelne, aes(x = kategoria, y = prawdopodobienstwo, group = model, color = model)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2) +
+  geom_point(data = filter(dane_pelne, model == "Ewolucyjny"),
+             color = "blue", size = 2, shape = 1) +
+  scale_y_log10(limits = c(1e-10, 1), breaks = 10^seq(0, -10, by = -1)) +
+  scale_color_manual(values = paleta_kolorow) +
+  labs(title = "Symulacja eksperymentu Luria-Delbrück - b",
+       x = "Liczba mutantów (m)",
+       y = expression(Estymowane~italic(P)(m)~"[log10]"),
+       color = "Model") +
+  theme_minimal() +
+  theme(
+    legend.position = c(0.85, 0.25),
+    legend.key.width = unit(2.5,"lines"),
+    legend.text = element_text(size = 10),
+    legend.title = element_blank(),
+    axis.text.x = element_text(angle = 90, hjust=1, vjust = 0.5, size =10)
+  )
+
+```
+
+Zadanie z Gillsepiego:
+
+```{r}
+library(deSolve)
+
+# Stałe reakcji
+szybkosc_AB <- 0.1
+szybkosc_BA <- 0.2
+pocz_A <- 50
+pocz_B <- 0
+wektor_A <- c(pocz_A)
+wektor_B <- c(pocz_B)
+
+czas <- c(0) # czas początkowy
+czas_max <- 100
+aktualny_czas <- 0
+krok <- 2 # licznik iteracji
+
+# Symulacja stochastyczna - metoda Gillespie
+while(aktualny_czas <= czas_max){
+  
+  szybkosc1 <- szybkosc_AB * wektor_A[krok-1] # synteza B z A
+  szybkosc2 <- szybkosc_BA * wektor_B[krok-1] # rozpad B do A
+  suma_szybkosci <- szybkosc1 + szybkosc2
+
+  los1 <- runif(1) # liczby losowe
+  los2 <- runif(1)
+  
+  krok_czasu <- -log(los1) / suma_szybkosci # czas do następnej reakcji
+  
+  # Reakcja syntezy B
+  if(0 <= los2 && los2 < szybkosc1 / suma_szybkosci) {
+    wektor_A[krok] <- wektor_A[krok-1] - 1
+    wektor_B[krok] <- wektor_B[krok-1] + 1
+    if(wektor_A[krok] < 0) wektor_A[krok] <- 0
+  }
+  # Reakcja rozpadu B
+  if(szybkosc1 / suma_szybkosci <= los2 && los2 <= 1) {
+    wektor_A[krok] <- wektor_A[krok-1] + 1
+    wektor_B[krok] <- wektor_B[krok-1] - 1
+    if(wektor_B[krok] < 0) wektor_B[krok] <- 0
+  }
+
+  czas[krok] <- czas[krok-1] + krok_czasu
+  aktualny_czas <- aktualny_czas + krok_czasu
+  krok <- krok + 1
+}
+
+# Wykres trajektorii stochastycznych
+plot(czas, wektor_A, type="l", col="red", ylim = range(c(wektor_A, wektor_B)),
+     xlab = "Czas", ylab = "Liczba cząsteczek", main = "Symulacja stochastyczna")
+lines(czas, wektor_B, col="blue")
+
+# Model deterministyczny
+model_det_A_B <- function(czaas, stan, parametry){
+  with(as.list(c(stan, parametry)), {
+    dA <- -szybkosc_AB * A + szybkosc_BA * B
+    dB <- szybkosc_AB * A - szybkosc_BA * B
+    return(list(c(A = dA, B = dB)))
+  })
+}
+
+parametry <- c(szybkosc_AB = szybkosc_AB, szybkosc_BA = szybkosc_BA)
+stan_pocz <- c(A = pocz_A, B = pocz_B)
+czas_det <- seq(0, 100, by = 0.1)
+
+wyniki_det <- as.data.frame(lsoda(y = stan_pocz, times = czas_det, 
+                                 func = model_det_A_B, parms = parametry))
+
+# Porównanie modeli
+plot(wyniki_det[, "time"], wyniki_det[, "A"], type = "l", col = "red", lwd = 2, 
+     ylim = c(0, max(wektor_A)), xlab = "Czas", ylab = "Liczba cząsteczek", 
+     main = "Porównanie modeli")
+lines(wyniki_det[, "time"], wyniki_det[, "B"], col = "blue", lwd = 2)
+
+# Dodanie wyników stochastycznych
+lines(czas, wektor_A, lty = 3, lwd = 1.5, col="red")
+lines(czas, wektor_B, lty = 3, lwd = 1.5, col="blue")
+
+legend("topright", legend = c("A - det.", "B - det.", "A - stoch.", "B - stoch."),
+       col = c("red", "blue", "red", "blue"), lty = c(1,1,3,3), cex=0.8)
+
+# Drugi model stochastyczny (asocjacja-dysocjacja)
+szybkosc_wiazania <- 0.01
+szybkosc_rozpadu <- 0.1
+pocz_L <- 50
+pocz_R <- 30
+pocz_LR <- 0
+wektor_L <- c(pocz_L)
+wektor_R <- c(pocz_R)
+wektor_LR <- c(pocz_LR)
+
+czas <- c(0)
+aktualny_czas <- 0
+krok <- 2
+
+while(aktualny_czas <= czas_max){
+  
+  prop_wiazanie <- szybkosc_wiazania * wektor_L[krok-1] * wektor_R[krok-1]
+  prop_rozpad <- szybkosc_rozpadu * wektor_LR[krok-1]
+  suma_prop <- prop_wiazanie + prop_rozpad
+  
+  los1 <- runif(1)
+  los2 <- runif(1)
+  
+  krok_czasu <- -log(los1) / suma_prop
+
+  # Reakcja wiązania
+  if(0 <= los2 && los2 < prop_wiazanie / suma_prop) {
+    wektor_L[krok] <- wektor_L[krok-1] - 1
+    wektor_R[krok] <- wektor_R[krok-1] - 1
+    wektor_LR[krok] <- wektor_LR[krok-1] + 1
+    if(wektor_L[krok] < 0) wektor_L[krok] <- 0
+    if(wektor_R[krok] < 0) wektor_R[krok] <- 0
+  }
+  # Reakcja rozpadu
+  if(prop_wiazanie / suma_prop <= los2 && los2 <= 1) {
+    wektor_L[krok] <- wektor_L[krok-1] + 1
+    wektor_R[krok] <- wektor_R[krok-1] + 1
+    wektor_LR[krok] <- wektor_LR[krok-1] - 1
+    if(wektor_LR[krok] < 0) wektor_LR[krok] <- 0
+  }
+  
+  czas[krok] <- czas[krok-1] + krok_czasu
+  aktualny_czas <- aktualny_czas + krok_czasu
+  krok <- krok + 1
+}
+
+# Model deterministyczny dla drugiego układu
+model_det_L_R <- function(czaas, stan, parametry) {
+  with(as.list(c(stan, parametry)), {
+    dL <- -szybkosc_wiazania * L * R + szybkosc_rozpadu * LR
+    dR <- -szybkosc_wiazania * L * R + szybkosc_rozpadu * LR
+    dLR <- szybkosc_wiazania * L * R - szybkosc_rozpadu * LR
+    return(list(c(dL, dR, dLR)))
+  })
+}
+
+parametry <- c(szybkosc_wiazania = szybkosc_wiazania, szybkosc_rozpadu = szybkosc_rozpadu)
+stan_pocz <- c(L = pocz_L, R = pocz_R, LR = pocz_LR)
+
+wyniki_det <- as.data.frame(lsoda(y = stan_pocz, times = czas_det, 
+                                 func = model_det_L_R, parms = parametry))
+
+# Wykres porównawczy
+plot(wyniki_det[, "time"], wyniki_det[, "L"], type = "l", col = "blue", lwd = 2,
+     ylim = c(0, max(wektor_L)), xlab = "Czas", ylab = "Liczba cząsteczek",
+     main = "Model asocjacji-dysocjacji")
+lines(wyniki_det[, "time"], wyniki_det[, "R"], col = "red", lwd = 2)
+lines(wyniki_det[, "time"], wyniki_det[, "LR"], col = "green", lwd = 2)
+
+# Dodanie wyników stochastycznych
+lines(czas, wektor_L, col = "blue", lty = 3, lwd = 1.5)
+lines(czas, wektor_R, col = "red", lty = 3, lwd = 1.5)
+lines(czas, wektor_LR, col = "green", lty = 3, lwd = 1.5)
+
+legend("right", legend = c("L - det.", "R - det.", "LR - det.", 
+                          "L - stoch.", "R - stoch.", "LR - stoch."),
+       col = c("blue", "red", "green", "blue", "red", "green"), 
+       lty = c(1, 1, 1, 3, 3, 3), cex=0.7)
+
+```
+
+Cukrzyca:
+
+```{r}
+library(deSolve)
+library(phaseR)
+
+# Funkcja aktywacji glukozy
+aktywacja_glukoza <- function(glukoza) {
+  glukoza^2 / (1 + glukoza^2)
+}
+
+# Model metabolizmu glukozy
+model_metabolizmu <- function(czaas, stan, parametry) {
+  with(as.list(c(stan, parametry)), {
+    glukoza <- stan[1]
+    insulina <- stan[2]
+    
+    # Dynamiczne m(t) - funkcja czasu
+    mt <- 0.5 + exp(-(czaas - 5)^2)
+    
+    dglukoza <- mt - wrażliwość * insulina * glukoza
+    dinsulina <- wydzielanie * beta * aktywacja_glukoza(glukoza) - degradacja * insulina
+    
+    list(c(dglukoza, dinsulina))
+  })
+}
+
+# Parametry dla zdrowych i z insulinoopornością
+param_zdrowy <- c(wrażliwość = 1, wydzielanie = 1, degradacja = 1, beta = 1)
+param_oporny <- c(wrażliwość = 0.1, wydzielanie = 1, degradacja = 1, beta = 1)
+```
+
+```{r}
+# Obliczanie stanu równowagi dla zdrowego
+rownowaga_zdrowy <- function(glukoza) {
+  insulina <- 0.5 / (1 * glukoza)
+  lewa_strona <- 1 * 1 * glukoza^2 / (1 + glukoza^2)
+  prawa_strona <- 1 * insulina
+  lewa_strona - prawa_strona
+}
+
+G_pocz <- uniroot(rownowaga_zdrowy, c(0.1, 6))$root
+I_pocz <- 0.5 / G_pocz
+war_pocz <- c(glukoza = G_pocz, insulina = I_pocz)
+
+# Symulacje czasowe
+okres_czasu <- seq(0, 24, 0.01) 
+sym_zdrowy <- as.data.frame(lsoda(war_pocz, okres_czasu, model_metabolizmu, param_zdrowy))
+sym_oporny <- as.data.frame(lsoda(war_pocz, okres_czasu, model_metabolizmu, param_oporny))
+
+# Wykres porównawczy
+plot(sym_zdrowy$time, sym_zdrowy$glukoza, type="l", col="blue", lwd=2, 
+     ylim=c(0, max(sym_oporny$glukoza)), ylab="Stężenie", xlab="Czas (h)")
+lines(sym_zdrowy$time, sym_zdrowy$insulina, col="red", lwd=2)
+lines(sym_oporny$time, sym_oporny$glukoza, col="blue", lty=2, lwd=2)
+lines(sym_oporny$time, sym_oporny$insulina, col="red", lty=2, lwd=2)
+legend("topright", 
+       legend=c("Glukoza - zdrowy", "Insulina - zdrowy", 
+                "Glukoza - oporność", "Insulina - oporność"),
+       col=c("blue", "red", "blue", "red"), 
+       lty=c(1,1,2,2), lwd=2, cex=0.8)
+```
+
+```{r}
+# Funkcja do obliczenia stanu równowagi dla insulinooporności
+rownowaga_oporny <- function(glukoza) {
+  insulina <- 0.5 / (0.1 * glukoza)  # wrażliwość = 0.1
+  lewa_strona <- glukoza^2 / (1 + glukoza^2)
+  prawa_strona <- insulina
+  lewa_strona - prawa_strona
+}
+
+G_pocz_oporny <- uniroot(rownowaga_oporny, c(0.1, 10))$root
+I_pocz_oporny <- 0.5 / (0.1 * G_pocz_oporny)
+war_pocz_oporny <- c(glukoza = G_pocz_oporny, insulina = I_pocz_oporny)
+```
+
+```{r}
+# Symulacja dla zdrowych
+sym_zdrowy <- as.data.frame(lsoda(war_pocz, okres_czasu, model_metabolizmu, param_zdrowy))
+
+# Symulacja dla insulinoopornych
+sym_oporny <- as.data.frame(lsoda(war_pocz_oporny, okres_czasu, model_metabolizmu, param_oporny))
+
+# Wykres porównawczy
+plot(sym_zdrowy$time, sym_zdrowy$glukoza, type="l", col="blue", lwd=2,
+     ylim=c(0, max(sym_oporny$glukoza)), ylab="Stężenie (mmol/L)", xlab="Czas (h)")
+lines(sym_zdrowy$time, sym_zdrowy$insulina, col="red", lwd=2)
+lines(sym_oporny$time, sym_oporny$glukoza, col="blue", lty=2, lwd=2)
+lines(sym_oporny$time, sym_oporny$insulina, col="red", lty=2, lwd=2)
+legend("topright", 
+       legend=c("Glukoza - zdrowy", "Insulina - zdrowy", 
+                "Glukoza - oporność", "Insulina - oporność"),
+       col=c("blue", "red", "blue", "red"), 
+       lty=c(1,1,2,2), lwd=2, cex=0.8)
+```
+
+```{r}
+# Portret fazowy dla zdrowego
+flowField(model_metabolizmu,
+          xlim = c(0, 5), ylim = c(0, 5),
+          parameters = param_zdrowy,
+          add = FALSE,
+          xlab = "Glukoza", ylab = "Insulina",
+          main = "Portret fazowy - zdrowy")
+grid()
+
+nullclines(model_metabolizmu, 
+           xlim = c(0, 5), ylim = c(0, 5), 
+           parameters = param_zdrowy, 
+           points = 300)
+
+war_pocz_faza <- matrix(c(1,1, 2,2, 3,1, 0.5, 3, 4,0.5), ncol=2, byrow=TRUE)
+trajectory(model_metabolizmu, 
+           y0 = war_pocz_faza, 
+           tlim = c(0, 20), 
+           parameters = param_zdrowy)
+
+# Portret fazowy dla insulinooporności
+flowField(model_metabolizmu,
+          xlim = c(0, 6), ylim = c(0, 6),
+          parameters = param_oporny,
+          add = FALSE,
+          xlab = "Glukoza", ylab = "Insulina",
+          main = "Portret fazowy - insulinooporność")
+nullclines(model_metabolizmu, 
+           xlim = c(0, 6), ylim = c(0, 6), 
+           parameters = param_oporny, 
+           points = 300)
+trajectory(model_metabolizmu, 
+           y0 = war_pocz_faza, 
+           tlim = c(0, 20), 
+           parameters = param_oporny)
+```
+
+DLA BIG:
+
+```{r}
+library(deSolve)
+
+# Funkcja opisująca wpływ glukozy na wydzielanie insuliny
+funkcja_aktywacji <- function(st_glukozy) {
+  st_glukozy^2  # Nieliniowa zależność od stężenia glukozy
+}
+
+# Funkcja opisująca tempo proliferacji komórek beta
+tempo_wzrostu <- function(st_glukozy) {
+  0.01 * (st_glukozy - 5)  # Wzrost gdy glukoza > 5, spadek gdy < 5
+}
+
+# Model dynamiki glukoza-insulina-komórki beta
+model_BIG <- function(czaas, stan, parametry) {
+  with(as.list(c(stan, parametry)), {
+    # Równania różniczkowe:
+    dglukoza <- doplyw - wrażliwość * insulina * glukoza
+    dinsulina <- wydzielanie * komórki_beta * funkcja_aktywacji(glukoza) - degradacja * insulina
+    dkomórki_beta <- komórki_beta * tempo_wzrostu(glukoza)
+    
+    list(c(dglukoza, dinsulina, dkomórki_beta))
+  })
+}
+
+# Parametry modelu
+parametry <- c(
+  wrażliwość = 1,   # Wrażliwość na insulinę
+  wydzielanie = 1,  # Tempo wydzielania insuliny
+  degradacja = 1,   # Degradacja insuliny
+  doplyw = 1        # Stały dopływ glukozy
+)
+
+# Warunki początkowe
+wartości_początkowe <- c(
+  glukoza = 4,      # Początkowe stężenie glukozy (poniżej progu 5)
+  insulina = 3,     # Początkowe stężenie insuliny
+  komórki_beta = 2  # Początkowa liczba komórek beta
+)
+
+# Symulacja w czasie
+czas_symulacji <- seq(0, 200, by = 0.01)
+wyniki <- as.data.frame(ode(
+  y = wartości_początkowe,
+  times = czas_symulacji,
+  func = model_BIG,
+  parms = parametry
+))
+
+# Wizualizacja wyników
+plot(wyniki$time, wyniki$glukoza, type = "l", col = "blue", lwd = 2,
+     ylab = "Stężenie / liczebność", xlab = "Czas")
+lines(wyniki$time, wyniki$insulina, col = "green", lwd = 2)
+lines(wyniki$time, wyniki$komórki_beta, col = "red", lwd = 2)
+legend("topright",
+       legend = c("Glukoza (G)", "Insulina (I)", "Komórki beta (B)"),
+       col = c("blue", "green", "red"), lty = 1, lwd = 2, cex = 0.9)
+```
+
+```{r}
+library(deSolve)
+
+# Model z dynamiczną zmianą wrażliwości na insulinę
+model_przełączany <- function(czaas, stan, parametry) {
+  with(as.list(c(stan, parametry)), {
+    # Po czasie 100 jednostek zmniejszamy wrażliwość (insulinooporność)
+    aktualna_wrażliwość <- ifelse(czaas < 100, 1, 0.1)
+    
+    # Równania różniczkowe:
+    dglukoza <- doplyw - aktualna_wrażliwość * insulina * glukoza
+    dinsulina <- wydzielanie * komórki_beta * glukoza^2 - degradacja * insulina
+    dkomórki_beta <- komórki_beta * 0.01 * (glukoza - 5)
+    
+    list(c(dglukoza, dinsulina, dkomórki_beta))
+  })
+}
+
+# Parametry (bez wrażliwości, bo jest dynamiczna)
+parametry <- c(
+  wydzielanie = 1,
+  degradacja = 1,
+  doplyw = 1
+)
+
+# Symulacja
+wartości_początkowe <- c(glukoza = 4, insulina = 1, komórki_beta = 1)
+czas_symulacji <- seq(0, 200, by = 0.1)
+wyniki <- as.data.frame(ode(
+  y = wartości_początkowe,
+  times = czas_symulacji,
+  func = model_przełączany,
+  parms = parametry
+))
+
+# Wykres zmian komórek beta
+plot(wyniki$time, wyniki$komórki_beta, type = "l", col = "red", lwd = 2,
+     xlab = "Czas", ylab = "Komórki β (B)")
+abline(v = 100, col = "gray", lty = 2)  # Linia momentu zmiany wrażliwości
+legend("topleft", legend = "B(t)", col = "red", lwd = 2)
+
+# Pełny wykres wszystkich zmiennych
+plot(wyniki$time, wyniki$komórki_beta, type = "l", col = "red", lwd = 2,
+     ylim = range(wyniki[,2:4]), ylab = "Stężenie / liczebność", xlab = "Czas")
+lines(wyniki$time, wyniki$glukoza, col = "blue", lwd = 2)
+lines(wyniki$time, wyniki$insulina, col = "green", lwd = 2)
+abline(v = 100, col = "gray", lty = 2)
+legend("topright",
+       legend = c("Glukoza (G)", "Insulina (I)", "Komórki beta (B)", "Zmiana parametrów"),
+       col = c("blue", "green", "red", "gray"), lty = c(1, 1, 1, 2), lwd = 2, cex = 0.9)
+```
+
+```{r}
+library(deSolve)
+
+# Model z okresowymi zmianami dopływu glukozy
+model_z_przebiciami <- function(czaas, stan, parametry) {
+  # Dynamiczna zmiana parametrów:
+  aktualna_wrażliwość <- ifelse(czaas >= 100, 0.1, parametry[1])  # Insulinooporność po czasie 100
+  
+  # Okresowe zwiększenie dopływu glukozy w określonych momentach
+  if (abs(czaas - 90) < 0.5 || abs(czaas - 100) < 0.5 || abs(czaas - 300) < 0.5) {
+    aktualny_doplyw <- 2  # Chwilowe zwiększenie dopływu
+  } else {
+    aktualny_doplyw <- parametry[4]
+  }
+
+  G <- stan[1]
+  I <- stan[2]
+  B <- stan[3]
+
+  # Równania różniczkowe:
+  dG <- aktualny_doplyw - aktualna_wrażliwość * I * G
+  dI <- parametry[2] * B * G^2 - parametry[3] * I
+  dB <- B * 0.01 * (G - 5)
+
+  list(c(dG, dI, dB))
+}
+
+# Parametry początkowe
+parametry <- c(
+  wrażliwość = 1,
+  wydzielanie = 1,
+  degradacja = 1,
+  doplyw = 1
+)
+
+# Symulacja
+wartości_początkowe <- c(G = 4, I = 1, B = 1)
+czas_symulacji <- seq(0, 400, 0.1)
+wyniki <- as.data.frame(lsoda(
+  y = wartości_początkowe,
+  times = czas_symulacji,
+  func = model_z_przebiciami,
+  parms = parametry
+))
+
+# Wizualizacja wyników
+plot(wyniki$time, wyniki$G, type = "l", col = "blue", lwd = 2,
+     ylim = c(0, max(wyniki$G, wyniki$I, wyniki$B)),
+     ylab = "Stężenie", xlab = "Czas")
+lines(wyniki$time, wyniki$I, col = "red", lwd = 2)
+lines(wyniki$time, wyniki$B, col = "green", lwd = 2)
+legend("topright",
+       legend = c("Glukoza (G)", "Insulina (I)", "Komórki beta (B)"),
+       col = c("blue", "red", "green"), lty = 1, lwd = 2, bty = "n", cex = 0.8)
+
+```
+
+Analiza wynikow:\
+czas t = 90 Po spożyciu posiłku następuje umiarkowany wzrost poziomu glukozy we krwi. Jednak jej stężenie szybko wraca do wartości wyjściowej. Dlaczego? Ponieważ parametr `s` wynosi 1 – oznacza to, że insulina działa skutecznie, a organizm sprawnie usuwa nadmiar glukozy z krwiobiegu. System funkcjonuje prawidłowo i szybko przywraca równowagę metaboliczną.
+
+czas t = 100 Poziom glukozy wzrasta znacznie bardziej niż poprzednio. Czas potrzebny na jego unormowanie również się wydłuża. Dzieje się tak, ponieważ właśnie w trakcie odpowiedzi hormonalnej dochodzi do nagłego obniżenia wrażliwości na insulinę (`s` spada). Organizm przestaje efektywnie reagować na insulinę – układ regulacyjny jest chwilowo zaburzony, przez co kontrola poziomu glukozy staje się mniej efektywna.
+
+czas t = 300 Po tym posiłku obserwujemy najwyższy wzrost poziomu glukozy, a jej stężenie długo utrzymuje się na podwyższonym poziomie. Dlaczego? Ponieważ `s` jest już stale niskie (np. 0.1), co oznacza, że wrażliwość na insulinę pozostaje osłabiona. Organizm nie potrafi skutecznie zareagować – glukoza nie jest efektywnie usuwana, a powrót do równowagi trwa znacznie dłużej.
+
+Zadanie z odwzorowania modelu Ozbudak
+
+```{r}
+
+# Stałe reakcji
+synteza_mRNA <- 0.1
+degradacja_mRNA <- 0.1
+synteza_bialka <- 1
+degradacja_bialka <- 0.002
+
+# Parametry symulacji
+czas_max <- 8 * 60  # 8 godzin w minutach
+aktualny_czas <- 0
+
+# Warunki początkowe
+liczba_mRNA <- c(0)
+liczba_bialka <- c(0)
+wektor_czasu <- c(0)
+krok <- 2
+
+# Ustalenie ziarna losowości dla powtarzalności wyników
+set.seed(1234)
+
+# Główna pętla symulacji
+while (aktualny_czas <= czas_max) {
+  # Aktualne stany
+  obecne_mRNA <- liczba_mRNA[krok - 1]
+  obecne_bialko <- liczba_bialka[krok - 1]
+  
+  # Obliczenie szybkości reakcji
+  szybkosci_reakcji <- c(
+    synteza_mRNA,               # Produkcja mRNA
+    degradacja_mRNA * obecne_mRNA,  # Degradacja mRNA
+    synteza_bialka * obecne_mRNA,   # Produkcja białka
+    degradacja_bialka * obecne_bialko  # Degradacja białka
+  )
+  
+  suma_szybkosci <- sum(szybkosci_reakcji)
+  if (suma_szybkosci == 0) break
+  
+  # Wyznaczenie czasu do następnej reakcji
+  losowa_1 <- runif(1)
+  delta_czasu <- -log(losowa_1) / suma_szybkosci
+  
+  # Wybór reakcji do wykonania
+  losowa_2 <- runif(1)
+  kumulowane_prawdopodobienstwa <- cumsum(szybkosci_reakcji) / suma_szybkosci
+  wybrana_reakcja <- which(kumulowane_prawdopodobienstwa >= losowa_2)[1]
+  
+  # Aktualizacja stanów
+  nowe_mRNA <- obecne_mRNA
+  nowe_bialko <- obecne_bialko
+  
+  if (wybrana_reakcja == 1) nowe_mRNA <- nowe_mRNA + 1
+  if (wybrana_reakcja == 2) nowe_mRNA <- max(0, nowe_mRNA - 1)
+  if (wybrana_reakcja == 3) nowe_bialko <- nowe_bialko + 1
+  if (wybrana_reakcja == 4) nowe_bialko <- max(0, nowe_bialko - 1)
+  
+  # Zapis wyników
+  liczba_mRNA[krok] <- nowe_mRNA
+  liczba_bialka[krok] <- nowe_bialko
+  aktualny_czas <- aktualny_czas + delta_czasu
+  wektor_czasu[krok] <- aktualny_czas
+  krok <- krok + 1
+}
+
+# Wizualizacja wyników
+plot(wektor_czasu, liczba_bialka, 
+     type = "l", col = "blue", lwd = 2,
+     xlab = "Czas (minuty)", 
+     ylab = "Liczba cząsteczek", 
+     main = "Odwzorowanie Ozbudak")
+
+lines(wektor_czasu, liczba_mRNA, col = "red", lwd = 2)
+
+legend("topright", 
+       legend = c("Białko", "mRNA"),
+       col = c("blue", "red"), 
+       lty = 1, lwd = 2)
+```
